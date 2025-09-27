@@ -1,101 +1,125 @@
-import Image from "next/image";
+'use client';
+
+import PropTypes from 'prop-types';
+import { 
+  Container, 
+  Typography, 
+  Button, 
+  Paper, 
+  Box,
+  Grid,
+  Card,
+  CardContent,
+  Chip
+} from '@mui/material';
+import { 
+  Train, 
+  Speed, 
+  CheckCircle,
+  Psychology 
+} from '@mui/icons-material';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const testFeatures = [
+    { name: 'Next.js 14', status: 'Working', color: 'success' },
+    { name: 'Material-UI v5', status: 'Working', color: 'success' }, 
+    { name: 'JavaScript', status: 'Working', color: 'success' },
+    { name: 'Spline 3D', status: 'Ready', color: 'info' },
+    { name: 'Theme System', status: 'Working', color: 'success' },
+  ];
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  const handleNextSteps = (action) => {
+    console.log(`Ready to ${action}!`);
+  };
+
+  return (
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      {/* Header */}
+      <Paper 
+        elevation={3} 
+        sx={{ 
+          p: 4, 
+          mb: 4, 
+          textAlign: 'center', 
+          background: 'linear-gradient(135deg, #1976d2 0%, #2e7d32 100%)', 
+          color: 'white' 
+        }}
+      >
+        <Train sx={{ fontSize: 48, mb: 2 }} />
+        <Typography variant="h3" gutterBottom>
+          SIH 2025 Railway Traffic Control
+        </Typography>
+        <Typography variant="h6" sx={{ opacity: 0.9 }}>
+          AI-Powered Train Management System - JavaScript Setup Complete! 🚀
+        </Typography>
+      </Paper>
+
+      {/* Status Cards */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        {testFeatures.map((feature, index) => (
+          <Grid item xs={12} sm={6} md={4} key={index}>
+            <Card>
+              <CardContent sx={{ textAlign: 'center' }}>
+                <CheckCircle sx={{ fontSize: 40, color: 'success.main', mb: 2 }} />
+                <Typography variant="h6" gutterBottom>
+                  {feature.name}
+                </Typography>
+                <Chip 
+                  label={feature.status} 
+                  color={feature.color}
+                  size="small"
+                />
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+
+      {/* Next Steps */}
+      <Paper elevation={2} sx={{ p: 3 }}>
+        <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+          <Psychology sx={{ mr: 1 }} />
+          Next Steps
+        </Typography>
+        <Typography variant="body1" sx={{ mb: 2 }}>
+          Your JavaScript project is successfully set up! Here's what to do next:
+        </Typography>
+        
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          <Button 
+            variant="contained" 
+            startIcon={<Speed />}
+            onClick={() => handleNextSteps('build components')}
           >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            Build Components
+          </Button>
+          <Button 
+            variant="outlined" 
+            onClick={() => handleNextSteps('setup database connection')}
           >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+            Setup Database
+          </Button>
+          <Button 
+            variant="outlined"
+            onClick={() => handleNextSteps('create 3D scene')}
+          >
+            Design 3D Scene
+          </Button>
+        </Box>
+      </Paper>
+
+      {/* JavaScript Features Highlight */}
+      <Paper elevation={1} sx={{ p: 2, mt: 3, bgcolor: 'info.light', color: 'info.contrastText' }}>
+        <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
+          <CheckCircle sx={{ mr: 1, fontSize: 18 }} />
+          <strong>JavaScript Ready:</strong> PropTypes for type checking, JSConfig for IntelliSense, and ES6+ features enabled
+        </Typography>
+      </Paper>
+    </Container>
   );
 }
+
+// PropTypes validation (replaces TypeScript types)
+Home.propTypes = {
+  // Add prop types as needed when this component receives props
+};
