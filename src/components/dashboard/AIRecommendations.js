@@ -9,7 +9,7 @@ import {
 } from '@mui/material';
 import {
   Psychology, TrendingUp, Warning, CheckCircle, Speed, Route,
-  Schedule, Emergency, Lightbulb, ExpandMore, PlayArrow,
+  Schedule, ReportProblem, Lightbulb, ExpandMore, PlayArrow,
   Autorenew, Timeline
 } from '@mui/icons-material';
 
@@ -96,7 +96,7 @@ export default function AIRecommendations({
               impact: 'Life-Critical Priority',
               confidence: 99,
               urgency: 'CRITICAL',
-              icon: Emergency,
+              icon: ReportProblem, // Changed from Emergency
               action: 'emergency-clear',
               estimatedBenefit: {
                 throughputImprovement: -50,
@@ -244,7 +244,7 @@ export default function AIRecommendations({
 
   const getTypeIcon = (type) => {
     switch (type) {
-      case 'EMERGENCY': return Emergency;
+      case 'EMERGENCY': return ReportProblem; // Changed from Emergency
       case 'PRIORITY': return Speed;
       case 'ROUTING': return Route;
       case 'SCHEDULING': return Schedule;
