@@ -1,13 +1,21 @@
 // src/components/3d/Railway3DVisualization.js
 'use client';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { Box, Typography, CircularProgress, Fab, Chip, Card, CardContent } from '@mui/material';
+import { 
+  Box, Typography, CircularProgress, Fab, Chip, Card, 
+  CardContent, Alert, Tooltip, SpeedDial, SpeedDialAction,
+  Badge, LinearProgress
+} from '@mui/material';
 import { 
   Speed, Pause, PlayArrow, Refresh, Visibility, 
-  Train as TrainIcon, Warning, CheckCircle 
+  Train as TrainIcon, Warning, CheckCircle, Videocam,
+  ThreeDRotation, CenterFocusStrong, MyLocation,
+  Timeline, Psychology, Emergency
 } from '@mui/icons-material';
 import Spline from '@spline-tool/react-spline';
+import { useSpline3D } from '@/hooks/useSpline3D';
+import SplineSceneManager from './SplineSceneManager';
 
 export default function Railway3DVisualization({ 
   scenario, 
@@ -15,226 +23,154 @@ export default function Railway3DVisualization({
   trafficData, 
   demoRunning 
 }) {
+  // State management
   const [loading, setLoading] = useState(true);
-  const [trains, setTrains] = useState([]);
+  const [sceneError, setSceneError] = useState(false);
+  const [currentCamera, setCurrentCamera] = useState('overview');
+  const [selectedTrain, setSelectedTrain] = useState(null);
   const [animationSpeed, setAnimationSpeed] = useState(1.0);
-  const [viewMode, setViewMode] = useState('overview');
-  const [splineError, setSplineError] = useState(false);
+  const [performanceMetrics, setPerformanceMetrics] = useState({});
+  
+  // Refs
   const splineRef = useRef(null);
+  const sceneManagerRef = useRef(null);
   
-  // Spline scene URL - You'll create this in Spline with railway tracks, trains, and signals
-  const splineSceneUrl = 'https://prod.spline.design/your-railway-scene-url/scene.splinecode';
-  
-  // Generate realistic train movements based on scenario
-  useEffect(() => {
-    const generateTrainMovements = () => {
-      const baseTrains = [
-        {
-          id: 'EXP001',
-          name: 'Rajdhani Express',
-          type: 'EXPRESS',
-          x: -50,
-          z: 0,
-          speed: 80,
-          color: '#ff4444',
-          priority: 8,
-          passengers: 1250
-        },
-        {
-          id: 'LOC002',
-          name: 'Local Passenger',
-          type: 'LOCAL',
-          x: -30,
-          z: 10,
-          speed: 60,
-          color: '#4444ff',
-          priority: 5,
-          passengers: 890
-        },
-        {
-          id: 'FRG003',
-          name: 'Freight Express',
-          type: 'FREIGHT',
-          x: -70,
-          z: -10,
-          speed: 40,
-          color: '#44ff44',
-          priority: 3,
-          cargo: 2400
-        },
-        {
-          id: 'EXP004',
-          name: 'Shatabdi Express',
-          type: 'EXPRESS',
-          x: 20,
-          z: 5,
-          speed: 85,
-          color: '#ff4444',
-          priority: 9,
-          passengers: 1100
-        }
-      ];
+  // Custom hook for 3D logic
+  const {
+    trains,
+    updateTrainPositions,
+    generateScenarioData,
+    handleScenarioChange
+  } = useSpline3D(scenario, aiMode);
 
-      let modifiedTrains = [...baseTrains];
+  // Spline scene URL - Replace with your actual scene
+  const splineSceneUrl = process.env.NEXT_PUBLIC_SPLINE_SCENE_URL || 
+    'https://prod.spline.design/6Wq8RjlyM3dBn2pf/scene.splinecode';
 
-      // Modify train positions and behavior based on scenario
-      switch (scenario) {
-        case 'congestion':
-          modifiedTrains = modifiedTrains.map(train => ({
-            ...train,
-            speed: train.speed * 0.6, // Reduce speed due to congestion
-            conflicted: Math.random() < 0.4, // 40% chance of conflict
-            delay: Math.random() < 0.3 ? Math.floor(Math.random() * 10) + 2 : 0
-          }));
-          break;
-          
-        case 'emergency':
-          // First train gets emergency priority
-          modifiedTrains[0].priority = true;
-          modifiedTrains[0].speed *= 1.5;
-          modifiedTrains[0].emergency = true;
-          modifiedTrains[0].color = '#ff0000';
-          
-          // Other trains slow down or stop
-          modifiedTrains.slice(1).forEach(train => {
-            train.speed *= 0.3;
-            train.status = 'HOLDING';
-          });
-          break;
-          
-        case 'optimized':
-          if (aiMode) {
-            modifiedTrains = modifiedTrains.map(train => ({
-              ...train,
-              speed: train.speed * 1.3, // AI optimization increases efficiency
-              optimized: true,
-              delay: Math.max(0, train.delay - 5), // Reduce delays
-              color: train.type === 'EXPRESS' ? '#00ff00' : train.color
-            }));
-          }
-          break;
-          
-        default: // normal
-          // Keep base configuration
-          break;
-      }
-
-      return modifiedTrains;
-    };
-
-    // Update train positions every second for smooth movement
-    const updateInterval = setInterval(() => {
-      setTrains(generateTrainMovements());
-    }, 1000);
-
-    return () => clearInterval(updateInterval);
-  }, [scenario, aiMode]);
-
-  // Handle Spline scene loading and object manipulation
-  const onLoad = (splineApp) => {
+  // Handle Spline scene loading
+  const onSplineLoad = useCallback((splineApp) => {
+    console.log('🎬 Spline scene loaded successfully');
     setLoading(false);
     splineRef.current = splineApp;
     
-    try {
-      // Update 3D objects based on train data
-      trains.forEach((train) => {
-        try {
-          // Find train object in Spline scene
-          const trainObject = splineApp.findObjectByName(`train-${train.id}`);
-          
-          if (trainObject) {
-            // Update position with smooth animation
-            trainObject.position.x = train.x;
-            trainObject.position.z = train.z;
-            
-            // Update color based on status
-            if (train.conflicted) {
-              trainObject.material.color.setHex(0xff0000); // Red for conflict
-            } else if (train.optimized) {
-              trainObject.material.color.setHex(0x00ff00); // Green for optimized
-            } else if (train.priority || train.emergency) {
-              trainObject.material.color.setHex(0xffaa00); // Orange for priority
-            } else {
-              trainObject.material.color.setHex(parseInt(train.color.replace('#', '0x')));
-            }
-            
-            // Update signal lights
-            const signal = splineApp.findObjectByName(`signal-${train.id}`);
-            if (signal) {
-              const signalColor = train.conflicted ? 0xff0000 : 
-                                 train.optimized ? 0x00ff00 : 0xffff00;
-              signal.material.emissive.setHex(signalColor);
-            }
-            
-            // Add particle effects for AI optimization
-            if (train.optimized && aiMode) {
-              const particles = splineApp.findObjectByName(`particles-${train.id}`);
-              if (particles) {
-                particles.visible = true;
-              }
-            }
-          }
-        } catch (error) {
-          console.warn(`Could not update 3D object for train ${train.id}:`, error);
-        }
-      });
+    // Initialize scene manager
+    sceneManagerRef.current = new SplineSceneManager(splineApp);
+    
+    // Set up initial scene
+    const initialData = generateScenarioData(scenario, aiMode);
+    sceneManagerRef.current.updateScene(initialData);
+    
+    // Set up interaction handlers
+    setupSceneInteractions(splineApp);
+    
+  }, [scenario, aiMode, generateScenarioData]);
 
-      // Update track colors based on scenario
-      const mainTrack = splineApp.findObjectByName('main-track');
-      if (mainTrack) {
-        switch (scenario) {
-          case 'congestion':
-            mainTrack.material.color.setHex(0xffaa00); // Orange for congestion
-            break;
-          case 'emergency':
-            mainTrack.material.color.setHex(0xff0000); // Red for emergency
-            break;
-          case 'optimized':
-            if (aiMode) {
-              mainTrack.material.color.setHex(0x00ff00); // Green for optimized
-            }
-            break;
-          default:
-            mainTrack.material.color.setHex(0x666666); // Default gray
+  // Set up scene interactions
+  const setupSceneInteractions = useCallback((splineApp) => {
+    // Handle train clicks
+    window.addEventListener('message', (event) => {
+      if (event.data.type === 'TRAIN_SELECTED') {
+        setSelectedTrain(event.data.trainId);
+        
+        // Focus camera on selected train
+        const trainObject = splineApp.findObjectByName(`train-${event.data.trainId}`);
+        if (trainObject && sceneManagerRef.current) {
+          sceneManagerRef.current.focusOnTrain(trainObject);
         }
       }
+    });
+
+    // Handle scenario updates from parent
+    window.addEventListener('message', (event) => {
+      if (event.data.type === 'SCENARIO_UPDATE') {
+        handleScenarioChange(event.data.scenario, event.data.aiMode);
+      }
+    });
+  }, [handleScenarioChange]);
+
+  // Update scene when scenario/AI mode changes
+  useEffect(() => {
+    if (sceneManagerRef.current) {
+      const sceneData = generateScenarioData(scenario, aiMode);
+      sceneManagerRef.current.updateScene(sceneData);
       
-    } catch (error) {
-      console.error('Error updating 3D scene:', error);
-      setSplineError(true);
+      // Update performance metrics
+      setPerformanceMetrics({
+        throughput: calculateThroughput(sceneData.trains),
+        efficiency: calculateEfficiency(scenario, aiMode),
+        conflicts: sceneData.conflicts?.length || 0,
+        optimizedTrains: sceneData.trains.filter(t => t.optimized).length
+      });
     }
+  }, [scenario, aiMode, generateScenarioData]);
+
+  // Animation loop for demo mode
+  useEffect(() => {
+    if (!demoRunning || !sceneManagerRef.current) return;
+
+    const animationInterval = setInterval(() => {
+      updateTrainPositions(animationSpeed);
+      
+      if (sceneManagerRef.current) {
+        const updatedData = generateScenarioData(scenario, aiMode);
+        sceneManagerRef.current.animateTrains(updatedData.trains, animationSpeed);
+      }
+    }, 100);
+
+    return () => clearInterval(animationInterval);
+  }, [demoRunning, animationSpeed, scenario, aiMode, updateTrainPositions, generateScenarioData]);
+
+  // Camera control functions
+  const changeCameraView = useCallback((viewType) => {
+    if (!sceneManagerRef.current) return;
+    
+    sceneManagerRef.current.setCameraView(viewType);
+    setCurrentCamera(viewType);
+  }, []);
+
+  // Error handling
+  const onSplineError = useCallback((error) => {
+    console.error('Spline scene loading error:', error);
+    setSceneError(true);
+    setLoading(false);
+  }, []);
+
+  // Performance calculations
+  const calculateThroughput = (trainsList) => {
+    const runningTrains = trainsList.filter(t => t.status === 'RUNNING' || t.status === 'OPTIMIZED');
+    return Math.min((runningTrains.length / 4) * 100, 100);
   };
 
-  // Handle view mode changes
-  const changeViewMode = (mode) => {
-    setViewMode(mode);
-    if (splineRef.current) {
-      try {
-        const camera = splineRef.current.findObjectByName('Camera');
-        if (camera) {
-          switch (mode) {
-            case 'overview':
-              camera.position.set(0, 100, 100);
-              camera.lookAt(0, 0, 0);
-              break;
-            case 'track':
-              camera.position.set(-20, 20, 20);
-              camera.lookAt(-20, 0, 0);
-              break;
-            case 'station':
-              camera.position.set(50, 30, 50);
-              camera.lookAt(50, 0, 0);
-              break;
-          }
-        }
-      } catch (error) {
-        console.warn('Could not change camera view:', error);
-      }
-    }
+  const calculateEfficiency = (currentScenario, aiActive) => {
+    const baseEfficiency = {
+      normal: 85,
+      congestion: 65,
+      emergency: 40,
+      optimized: aiActive ? 95 : 75
+    };
+    return baseEfficiency[currentScenario] || 85;
+  };
+
+  // Get scenario color
+  const getScenarioColor = (currentScenario) => {
+    const colors = {
+      normal: 'success',
+      congestion: 'warning', 
+      emergency: 'error',
+      optimized: 'info'
+    };
+    return colors[currentScenario] || 'default';
   };
 
   return (
-    <Box sx={{ position: 'relative', height: '100%', bgcolor: '#f5f5f5', borderRadius: 1 }}>
+    <Box sx={{ 
+      position: 'relative', 
+      height: '100%', 
+      bgcolor: '#f0f2f5', 
+      borderRadius: 2, 
+      overflow: 'hidden',
+      boxShadow: 3
+    }}>
       {/* Loading State */}
       {loading && (
         <Box sx={{
@@ -243,17 +179,26 @@ export default function Railway3DVisualization({
           left: '50%',
           transform: 'translate(-50%, -50%)',
           zIndex: 10,
-          textAlign: 'center'
+          textAlign: 'center',
+          bgcolor: 'rgba(255, 255, 255, 0.95)',
+          p: 4,
+          borderRadius: 3,
+          boxShadow: 4,
+          minWidth: 300
         }}>
           <CircularProgress size={60} thickness={4} />
-          <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
-            Loading Railway Network...
+          <Typography variant="h6" sx={{ mt: 2, mb: 1, fontWeight: 600 }}>
+            Loading Railway Network
           </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Initializing 3D visualization engine...
+          </Typography>
+          <LinearProgress sx={{ mt: 2, width: '100%' }} />
         </Box>
       )}
 
-      {/* Error State */}
-      {splineError && (
+      {/* Error Fallback */}
+      {sceneError && (
         <Box sx={{
           position: 'absolute',
           top: '50%',
@@ -262,186 +207,332 @@ export default function Railway3DVisualization({
           zIndex: 10,
           textAlign: 'center'
         }}>
-          <Warning sx={{ fontSize: 48, color: 'warning.main', mb: 2 }} />
-          <Typography variant="h6">3D Scene Loading Failed</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Displaying simulation data instead
-          </Typography>
+          <Alert severity="warning" sx={{ mb: 2, minWidth: 300 }}>
+            <Typography variant="h6">3D Scene Unavailable</Typography>
+            <Typography variant="body2">
+              Spline scene could not be loaded. Using fallback mode.
+            </Typography>
+          </Alert>
+          
+          {/* Fallback 2D visualization */}
+          <Card sx={{ p: 3, bgcolor: 'background.paper' }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Railway Network Simulation
+            </Typography>
+            <Box sx={{ 
+              width: '100%', 
+              height: 300, 
+              bgcolor: 'primary.light', 
+              borderRadius: 2,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'column'
+            }}>
+              <TrainIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
+              <Typography variant="h6" color="primary.main">
+                Simulation Active
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Scenario: {scenario} | AI: {aiMode ? 'Enabled' : 'Disabled'}
+              </Typography>
+            </Box>
+          </Card>
         </Box>
       )}
 
       {/* Spline 3D Scene */}
-      {!splineError && (
+      {!sceneError && (
         <Spline
           scene={splineSceneUrl}
-          onLoad={onLoad}
-          onError={() => setSplineError(true)}
+          onLoad={onSplineLoad}
+          onError={onSplineError}
           style={{
             width: '100%',
             height: '100%',
-            borderRadius: '4px'
+            borderRadius: '8px'
           }}
         />
       )}
 
-      {/* Fallback 2D Visualization when Spline fails */}
-      {splineError && (
-        <Box sx={{
-          width: '100%',
-          height: '100%',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          position: 'relative',
-          borderRadius: 1,
-          overflow: 'hidden'
-        }}>
-          {/* Simulated Railway Track */}
-          <svg
-            width="100%"
-            height="100%"
-            style={{ position: 'absolute', top: 0, left: 0 }}
-          >
-            {/* Main track lines */}
-            <line x1="10%" y1="50%" x2="90%" y2="50%" stroke="#fff" strokeWidth="4" />
-            <line x1="10%" y1="55%" x2="90%" y2="55%" stroke="#fff" strokeWidth="4" />
-            
-            {/* Track switches */}
-            <path d="M 30% 50% L 40% 30%" stroke="#fff" strokeWidth="3" />
-            <path d="M 60% 50% L 70% 70%" stroke="#fff" strokeWidth="3" />
-            
-            {/* Animated trains */}
-            {trains.map((train, index) => (
-              <g key={train.id}>
-                <rect
-                  x={`${30 + (index * 15)}%`}
-                  y="45%"
-                  width="8%"
-                  height="10%"
-                  fill={train.color}
-                  rx="2"
-                  style={{
-                    animation: demoRunning ? `moveRight-${index} 10s infinite linear` : 'none'
-                  }}
-                />
-                <text
-                  x={`${32 + (index * 15)}%`}
-                  y="52%"
-                  fill="white"
-                  fontSize="8"
-                  fontWeight="bold"
-                  textAnchor="middle"
-                >
-                  {train.type.substring(0, 3)}
-                </text>
-              </g>
-            ))}
-          </svg>
-        </Box>
-      )}
-
-      {/* Overlay Information Panel */}
-      <Box sx={{
+      {/* Live Status Panel */}
+      <Card sx={{
         position: 'absolute',
-        top: 16,
-        left: 16,
+        top: 20,
+        left: 20,
+        minWidth: 320,
+        maxWidth: 380,
         bgcolor: 'rgba(255, 255, 255, 0.95)',
-        p: 2,
-        borderRadius: 2,
-        minWidth: 250,
-        boxShadow: 2
+        backdropFilter: 'blur(12px)',
+        boxShadow: 4
       }}>
-        <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
-          Live Network Status
-        </Typography>
-        
-        <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap' }}>
-          <Chip
-            label={`Active Trains: ${trains.length}`}
-            size="small"
-            color="primary"
-          />
-          <Chip
-            label={`Scenario: ${scenario}`}
-            size="small"
-            color={scenarios[scenario]?.color || 'default'}
-          />
-        </Box>
-        
-        <Typography variant="body2" color="text.secondary">
-          AI Mode: {aiMode ? 'Enabled' : 'Disabled'}
-        </Typography>
-        
-        {trains.filter(t => t.conflicted).length > 0 && (
-          <Typography variant="body2" color="error" sx={{ mt: 1 }}>
-            ⚠️ Conflicts: {trains.filter(t => t.conflicted).length}
-          </Typography>
-        )}
-        
-        {trains.filter(t => t.optimized).length > 0 && (
-          <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>
-            ✅ Optimized: {trains.filter(t => t.optimized).length}
-          </Typography>
-        )}
-      </Box>
+        <CardContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', fontWeight: 600 }}>
+              <Badge badgeContent={trains.length} color="primary">
+                <TrainIcon sx={{ mr: 1, color: 'primary.main' }} />
+              </Badge>
+              Live Network Status
+            </Typography>
+            
+            {demoRunning && (
+              <Chip 
+                label="Demo Running" 
+                color="success" 
+                size="small"
+                icon={<PlayArrow />}
+                sx={{ animation: 'pulse 2s infinite' }}
+              />
+            )}
+          </Box>
+          
+          {/* Status Chips */}
+          <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+            <Chip
+              label={`${trains.length} Active`}
+              size="small"
+              color="primary"
+              icon={<TrainIcon />}
+            />
+            <Chip
+              label={scenario.charAt(0).toUpperCase() + scenario.slice(1)}
+              size="small"
+              color={getScenarioColor(scenario)}
+            />
+            <Chip
+              label={aiMode ? 'AI Active' : 'Manual'}
+              size="small"
+              color={aiMode ? 'success' : 'default'}
+              icon={aiMode ? <Psychology /> : <Timeline />}
+            />
+          </Box>
+          
+          {/* Performance Metrics */}
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
+              Performance Metrics:
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+              <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'primary.light', borderRadius: 1 }}>
+                <Typography variant="h6" color="primary.dark">
+                  {performanceMetrics.throughput || 0}%
+                </Typography>
+                <Typography variant="caption">Throughput</Typography>
+              </Box>
+              <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'success.light', borderRadius: 1 }}>
+                <Typography variant="h6" color="success.dark">
+                  {performanceMetrics.efficiency || 0}%
+                </Typography>
+                <Typography variant="caption">Efficiency</Typography>
+              </Box>
+            </Box>
+          </Box>
 
-      {/* Control Panel */}
+          {/* Alert Messages */}
+          {performanceMetrics.conflicts > 0 && (
+            <Alert severity="warning" sx={{ mb: 1 }}>
+              ⚠️ {performanceMetrics.conflicts} Active Conflicts
+            </Alert>
+          )}
+          
+          {performanceMetrics.optimizedTrains > 0 && (
+            <Alert severity="success" sx={{ mb: 1 }}>
+              ✨ {performanceMetrics.optimizedTrains} Trains AI-Optimized
+            </Alert>
+          )}
+
+          {scenario === 'emergency' && (
+            <Alert severity="error" sx={{ mb: 1 }}>
+              🚨 Emergency Protocol Active
+            </Alert>
+          )}
+
+          {/* Train Status List */}
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
+              Active Trains ({trains.length}):
+            </Typography>
+            {trains.slice(0, 4).map(train => (
+              <Box 
+                key={train.id} 
+                sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  py: 1,
+                  px: 1.5,
+                  mb: 0.5,
+                  bgcolor: selectedTrain === train.id ? 'primary.light' : 'grey.50',
+                  borderRadius: 1,
+                  cursor: 'pointer',
+                  border: selectedTrain === train.id ? 2 : 1,
+                  borderColor: selectedTrain === train.id ? 'primary.main' : 'grey.200',
+                  '&:hover': { bgcolor: 'primary.light', opacity: 0.8 }
+                }}
+                onClick={() => setSelectedTrain(selectedTrain === train.id ? null : train.id)}
+              >
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                    {train.id}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {train.name} • {train.type}
+                  </Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {train.emergency && <Emergency sx={{ color: 'error.main', fontSize: 16 }} />}
+                  {train.optimized && <Psychology sx={{ color: 'success.main', fontSize: 16 }} />}
+                  <Chip
+                    label={`${train.speed} km/h`}
+                    size="small"
+                    color={
+                      train.emergency ? 'error' :
+                      train.optimized ? 'success' : 
+                      train.conflicted ? 'warning' : 'default'
+                    }
+                    sx={{ fontSize: '0.7rem', minWidth: '70px' }}
+                  />
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </CardContent>
+      </Card>
+
+      {/* Camera Controls - Speed Dial */}
+      <SpeedDial
+        ariaLabel="Camera Controls"
+        sx={{ position: 'absolute', bottom: 20, right: 20 }}
+        icon={<Videocam />}
+        direction="up"
+      >
+        <SpeedDialAction
+          icon={<Visibility />}
+          tooltipTitle="Overview Camera"
+          onClick={() => changeCameraView('overview')}
+        />
+        <SpeedDialAction
+          icon={<MyLocation />}
+          tooltipTitle="Track Level View"
+          onClick={() => changeCameraView('track')}
+        />
+        <SpeedDialAction
+          icon={<CenterFocusStrong />}
+          tooltipTitle="Junction View"
+          onClick={() => changeCameraView('junction')}
+        />
+        <SpeedDialAction
+          icon={<TrainIcon />}
+          tooltipTitle="Station View"
+          onClick={() => changeCameraView('station')}
+        />
+      </SpeedDial>
+
+      {/* Animation & View Controls */}
       <Box sx={{
         position: 'absolute',
-        bottom: 16,
-        right: 16,
+        bottom: 20,
+        left: 20,
         display: 'flex',
         gap: 1,
         flexDirection: 'column'
       }}>
-        {/* View Controls */}
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Fab
-            size="small"
-            color={viewMode === 'overview' ? 'primary' : 'default'}
-            onClick={() => changeViewMode('overview')}
-          >
-            <Visibility />
-          </Fab>
-          <Fab
-            size="small"
-            color="secondary"
-            onClick={() => setAnimationSpeed(animationSpeed === 1 ? 2 : 1)}
-          >
-            <Speed />
-          </Fab>
+          <Tooltip title={`Animation Speed: ${animationSpeed}x`}>
+            <Fab
+              size="small"
+              color="secondary"
+              onClick={() => setAnimationSpeed(animationSpeed >= 2 ? 1 : animationSpeed + 0.5)}
+            >
+              <Speed />
+            </Fab>
+          </Tooltip>
+          
+          <Tooltip title="Reset Camera">
+            <Fab
+              size="small"
+              onClick={() => changeCameraView('overview')}
+            >
+              <Refresh />
+            </Fab>
+          </Tooltip>
+          
+          <Tooltip title="3D Controls">
+            <Fab
+              size="small"
+              color="primary"
+            >
+              <ThreeDRotation />
+            </Fab>
+          </Tooltip>
         </Box>
 
-        {/* Animation Speed Indicator */}
+        {/* Speed Indicator */}
         {animationSpeed !== 1 && (
           <Chip
             label={`${animationSpeed}x Speed`}
             size="small"
             color="secondary"
-            sx={{ alignSelf: 'center' }}
+            sx={{ alignSelf: 'flex-start' }}
           />
         )}
       </Box>
 
-      {/* Performance Indicator */}
-      <Box sx={{
-        position: 'absolute',
-        top: 16,
-        right: 16,
-        display: 'flex',
-        gap: 1
-      }}>
-        {aiMode && scenario === 'optimized' && (
-          <Card sx={{ bgcolor: 'success.light', p: 1 }}>
-            <CardContent sx={{ p: '8px !important' }}>
-              <Typography variant="caption" sx={{ color: 'success.dark', fontWeight: 600 }}>
-                🚀 AI Optimization Active
-              </Typography>
-              <Typography variant="caption" sx={{ display: 'block', color: 'success.dark' }}>
-                +{Math.floor(Math.random() * 15) + 20}% Throughput
-              </Typography>
-            </CardContent>
-          </Card>
-        )}
-      </Box>
+      {/* AI Performance Indicator */}
+      {aiMode && scenario === 'optimized' && (
+        <Card sx={{
+          position: 'absolute',
+          top: 20,
+          right: 20,
+          bgcolor: 'success.main',
+          color: 'success.contrastText',
+          minWidth: 200
+        }}>
+          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Psychology sx={{ mr: 1.5, fontSize: 28 }} />
+              <Box>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  AI Optimization Active
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                  +{(25 + Math.random() * 15).toFixed(1)}% Throughput
+                </Typography>
+                <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                  Real-time traffic optimization
+                </Typography>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Emergency Banner */}
+      {scenario === 'emergency' && (
+        <Alert 
+          severity="error" 
+          sx={{ 
+            position: 'absolute', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            zIndex: 5,
+            borderRadius: 0,
+            '& .MuiAlert-message': {
+              width: '100%',
+              textAlign: 'center'
+            }
+          }}
+        >
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            🚨 EMERGENCY PROTOCOL ACTIVE 🚨
+          </Typography>
+          <Typography variant="body2">
+            All trains are being safely managed. Emergency corridor is clear.
+          </Typography>
+        </Alert>
+      )}
     </Box>
   );
 }
