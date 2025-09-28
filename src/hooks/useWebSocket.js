@@ -4,39 +4,31 @@ import { useState, useEffect, useRef } from 'react';
 
 export const useWebSocket = (url) => {
   const [socketData, setSocketData] = useState(null);
-  const [connectionStatus, setConnectionStatus] = useState('Connecting');
-  const ws = useRef(null);
+  const [connectionStatus, setConnectionStatus] = useState('Connected'); // Start as connected
+  const intervalRef = useRef(null);
 
   useEffect(() => {
-    // For demo purposes, simulate WebSocket with intervals
-    // In production, you would connect to actual WebSocket server
-    const simulateWebSocket = () => {
+    // Simulate WebSocket connection without actual connection
+    const simulateConnection = () => {
       setConnectionStatus('Connected');
       
-      const interval = setInterval(() => {
-        // Simulate incoming real-time data
+      // Clear any existing interval
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      
+      // Send periodic updates every 10 seconds (not too frequent)
+      intervalRef.current = setInterval(() => {
         const messages = [
           {
             type: 'TRAIN_UPDATE',
-            message: 'Train EXP001 approaching Platform 2',
+            message: 'Train position updated',
             level: 'info',
             timestamp: new Date().toISOString()
           },
           {
-            type: 'CONFLICT_DETECTED',
-            message: 'Potential conflict detected at Junction Alpha',
-            level: 'warning',
-            timestamp: new Date().toISOString()
-          },
-          {
-            type: 'AI_RECOMMENDATION',
-            message: 'AI suggests rerouting LOC002 to Track 3',
-            level: 'info',
-            timestamp: new Date().toISOString()
-          },
-          {
-            type: 'THROUGHPUT_UPDATE',
-            message: 'Section throughput increased by 12%',
+            type: 'SYSTEM_HEALTH',
+            message: 'All systems operational',
             level: 'success',
             timestamp: new Date().toISOString()
           }
@@ -44,28 +36,31 @@ export const useWebSocket = (url) => {
         
         const randomMessage = messages[Math.floor(Math.random() * messages.length)];
         setSocketData(randomMessage);
-      }, 3000);
-      
-      return () => clearInterval(interval);
+      }, 10000); // Every 10 seconds instead of 3 seconds
     };
 
-    const cleanup = simulateWebSocket();
+    simulateConnection();
     
-    return cleanup;
-  }, [url]);
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, []); // Remove url dependency to prevent re-renders
 
   const sendMessage = (message) => {
-    // In production, this would send to actual WebSocket
     console.log('Sending message:', message);
     
-    // Simulate response
+    // Simulate response without triggering re-renders
     setTimeout(() => {
-      setSocketData({
-        type: 'ACTION_RESPONSE',
-        message: `Action executed: ${message.type}`,
-        level: 'success',
-        timestamp: new Date().toISOString()
-      });
+      if (message.type !== 'SCENARIO_CHANGE') { // Avoid duplicate alerts
+        setSocketData({
+          type: 'ACTION_RESPONSE',
+          message: `Action executed: ${message.type}`,
+          level: 'success',
+          timestamp: new Date().toISOString()
+        });
+      }
     }, 1000);
   };
 

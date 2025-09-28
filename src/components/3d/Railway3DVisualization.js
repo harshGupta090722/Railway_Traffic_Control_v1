@@ -20,7 +20,7 @@ export default function Railway3DVisualization({
   trafficData, 
   demoRunning 
 }) {
-  const [loading, setLoading] = useState(true);
+  //const [loading, setLoading] = useState(true);
   const [trains, setTrains] = useState([]);
   const [animationSpeed, setAnimationSpeed] = useState(1.0);
   const [viewMode, setViewMode] = useState('overview');
@@ -121,12 +121,12 @@ export default function Railway3DVisualization({
   }, [scenario, aiMode]);
 
   // Simulate loading
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, []);
+  // useEffect(() => {
+  //   const timer = setTimeout(() => {
+  //     setLoading(false);
+  //   }, 2000);
+  //   return () => clearTimeout(timer);
+  // }, []);
 
   // Update trains data and performance metrics
   useEffect(() => {
@@ -198,7 +198,7 @@ export default function Railway3DVisualization({
       boxShadow: 3
     }}>
       {/* Loading State */}
-      {loading && (
+      {/* {loading && (
         <Box sx={{
           position: 'absolute',
           top: '50%',
@@ -221,10 +221,10 @@ export default function Railway3DVisualization({
           </Typography>
           <LinearProgress sx={{ mt: 2, width: '100%' }} />
         </Box>
-      )}
+      )} */}
 
       {/* Fallback 3D Simulation */}
-      {!loading && (
+      {(
         <Box sx={{
           width: '100%',
           height: '100%',

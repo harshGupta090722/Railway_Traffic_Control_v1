@@ -1,7 +1,6 @@
 // src/app/page.js
 'use client';
 import { useState, useEffect } from 'react';
-import PropTypes from 'prop-types';
 import {
   Container, Grid, Paper, Typography, Box, Card, CardContent,
   AppBar, Toolbar, Chip, Button, Alert, Fab, IconButton,
@@ -13,7 +12,7 @@ import {
   ModelTraining, NotificationsActive
 } from '@mui/icons-material';
 
-// Import your actual components from Step 4
+// Import components
 import TrafficControlCenter from '@/components/dashboard/TrafficControlCenter';
 import AIRecommendations from '@/components/dashboard/AIRecommendations';
 import PerformanceMetrics from '@/components/dashboard/PerformanceMetrics';
@@ -21,23 +20,26 @@ import Railway3DVisualization from '@/components/3d/Railway3DVisualization';
 import ConflictManager from '@/components/dashboard/ConflictManager';
 import SystemStatus from '@/components/dashboard/SystemStatus';
 
-// Import custom hooks from Step 4
-import { useTrafficData } from '@/hooks/useTrafficData';
-import { useWebSocket } from '@/hooks/useWebSocket';
-
 export default function Home() {
-  // State management for dashboard
+  // Simplified state management
   const [selectedScenario, setSelectedScenario] = useState('normal');
   const [aiMode, setAiMode] = useState(false);
   const [alerts, setAlerts] = useState([]);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [demoRunning, setDemoRunning] = useState(false);
   
-  // Custom hooks for data management (from Step 4)
-  const { trafficData, loading, error } = useTrafficData();
-  const { socketData, sendMessage, connectionStatus } = useWebSocket('ws://localhost:8000');
+  // Mock data to prevent loading issues
+  const trafficData = {
+    trains: [
+      { id: 'EXP001', name: 'Rajdhani Express', type: 'EXPRESS', speed: 85, status: 'RUNNING' },
+      { id: 'LOC002', name: 'Local Passenger', type: 'LOCAL', speed: 60, status: 'RUNNING' },
+      { id: 'FRG003', name: 'Freight Express', type: 'FREIGHT', speed: 45, status: 'DELAYED' },
+      { id: 'EXP004', name: 'Shatabdi Express', type: 'EXPRESS', speed: 90, status: 'RUNNING' }
+    ]
+  };
 
-  // Demo scenarios for impressive presentation
+  const connectionStatus = 'Connected';
+
+  // Demo scenarios
   const scenarios = {
     normal: { 
       name: 'Normal Operations', 
@@ -61,76 +63,77 @@ export default function Home() {
     }
   };
 
-  // Effect for handling real-time socket updates
-  useEffect(() => {
-    if (socketData) {
-      setAlerts(prev => [...prev.slice(-4), socketData]);
-      
-      // Auto-enable AI mode for optimized scenario
-      if (socketData.type === 'SCENARIO_CHANGE' && socketData.scenario === 'optimized') {
-        setAiMode(true);
-      }
-    }
-  }, [socketData]);
-
-  // Handlers for interactive controls
+  // Simplified handlers
   const handleScenarioChange = (scenario) => {
     setSelectedScenario(scenario);
-    sendMessage({ 
-      type: 'SCENARIO_CHANGE', 
-      scenario,
-      timestamp: new Date().toISOString()
-    });
     
-    // Show impressive demo transition alert
-    setAlerts(prev => [...prev, {
+    // Show transition alert
+    setAlerts(prev => [...prev.slice(-3), {
       type: 'SCENARIO_CHANGE',
-      message: `Switching to ${scenarios[scenario].name} - Analyzing traffic patterns...`,
+      message: `Switched to ${scenarios[scenario].name}`,
       level: 'info',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      id: Date.now()
     }]);
   };
 
   const toggleAIMode = () => {
     const newAiMode = !aiMode;
     setAiMode(newAiMode);
-    sendMessage({ 
-      type: 'AI_MODE_TOGGLE', 
-      enabled: newAiMode,
-      timestamp: new Date().toISOString()
-    });
     
-    setAlerts(prev => [...prev, {
+    setAlerts(prev => [...prev.slice(-3), {
       type: 'AI_MODE_CHANGE',
-      message: newAiMode ? 'AI Optimization ACTIVATED - Real-time analysis started' : 'AI Optimization DEACTIVATED',
+      message: newAiMode ? 'AI Optimization ACTIVATED' : 'AI Optimization DEACTIVATED',
       level: newAiMode ? 'success' : 'info',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      id: Date.now()
     }]);
   };
 
   const startDemoSequence = () => {
+    if (demoRunning) return;
+    
     setDemoRunning(true);
     
-    // Automated demo sequence for presentation
+    // Simple demo sequence
     const demoSteps = [
       { scenario: 'normal', duration: 3000 },
-      { scenario: 'congestion', duration: 5000 },
-      { scenario: 'optimized', aiMode: true, duration: 5000 }
+      { scenario: 'congestion', duration: 4000 },
+      { scenario: 'optimized', aiMode: true, duration: 4000 }
     ];
     
-    demoSteps.forEach((step, index) => {
-      setTimeout(() => {
+    let currentStep = 0;
+    const executeStep = () => {
+      if (currentStep < demoSteps.length) {
+        const step = demoSteps[currentStep];
         setSelectedScenario(step.scenario);
         if (step.aiMode) setAiMode(true);
         
-        if (index === demoSteps.length - 1) {
-          setTimeout(() => setDemoRunning(false), step.duration);
-        }
-      }, index * (demoSteps[index - 1]?.duration || 0));
-    });
+        currentStep++;
+        setTimeout(executeStep, step.duration);
+      } else {
+        setDemoRunning(false);
+      }
+    };
+    
+    executeStep();
   };
 
-  // Sidebar navigation items
+  const sendMessage = (message) => {
+    console.log('Message sent:', message);
+    // Mock response
+    setTimeout(() => {
+      setAlerts(prev => [...prev.slice(-3), {
+        type: 'ACTION_RESPONSE',
+        message: `Action completed: ${message.type}`,
+        level: 'success',
+        timestamp: new Date().toISOString(),
+        id: Date.now()
+      }]);
+    }, 1000);
+  };
+
+  // Navigation items
   const navigationItems = [
     { text: 'Dashboard', icon: DashboardIcon, active: true },
     { text: 'Live Traffic', icon: Traffic },
@@ -139,23 +142,6 @@ export default function Home() {
     { text: 'Training', icon: ModelTraining },
     { text: 'Settings', icon: Settings }
   ];
-
-  if (loading) {
-    return (
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh',
-        background: 'linear-gradient(135deg, #1976d2 0%, #2e7d32 100%)'
-      }}>
-        <Card sx={{ p: 4, textAlign: 'center' }}>
-          <Train sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
-          <Typography variant="h6">Loading Railway Control System...</Typography>
-        </Card>
-      </Box>
-    );
-  }
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f5f5f5' }}>
@@ -206,10 +192,6 @@ export default function Home() {
         {/* Top Navigation Bar */}
         <AppBar position="static" sx={{ bgcolor: '#1976d2', mb: 3 }}>
           <Toolbar>
-            <IconButton edge="start" color="inherit" onClick={() => setDrawerOpen(true)}>
-              <Menu />
-            </IconButton>
-            
             <Train sx={{ mr: 2 }} />
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
               AI-Powered Railway Traffic Control System
@@ -218,7 +200,7 @@ export default function Home() {
             {/* Connection Status */}
             <Chip
               label={`Status: ${connectionStatus}`}
-              color={connectionStatus === 'Connected' ? 'success' : 'warning'}
+              color="success"
               sx={{ mr: 2, color: 'white' }}
             />
             
@@ -255,12 +237,12 @@ export default function Home() {
 
         <Container maxWidth="xl">
           {/* Alert System */}
-          {alerts.slice(-2).map((alert, index) => (
+          {alerts.slice(-2).map((alert) => (
             <Alert
-              key={index}
+              key={alert.id}
               severity={alert.level || 'info'}
               sx={{ mb: 2 }}
-              onClose={() => setAlerts(prev => prev.filter((_, i) => i !== index))}
+              onClose={() => setAlerts(prev => prev.filter(a => a.id !== alert.id))}
             >
               {alert.message}
             </Alert>
@@ -268,7 +250,7 @@ export default function Home() {
 
           {/* Main Dashboard Grid */}
           <Grid container spacing={3}>
-            {/* 3D Railway Visualization - Takes prominent space */}
+            {/* 3D Railway Visualization */}
             <Grid item xs={12} lg={8}>
               <Paper elevation={3} sx={{ p: 2, height: 600, position: 'relative' }}>
                 <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
@@ -281,22 +263,6 @@ export default function Home() {
                   trafficData={trafficData}
                   demoRunning={demoRunning}
                 />
-                
-                {/* 3D Controls Overlay */}
-                <Box sx={{ 
-                  position: 'absolute', 
-                  bottom: 16, 
-                  right: 16,
-                  display: 'flex',
-                  gap: 1
-                }}>
-                  <Fab size="small" color="primary">
-                    <Speed />
-                  </Fab>
-                  <Fab size="small" color="secondary">
-                    <Settings />
-                  </Fab>
-                </Box>
               </Paper>
             </Grid>
 
@@ -305,7 +271,7 @@ export default function Home() {
               <AIRecommendations 
                 scenario={selectedScenario}
                 aiMode={aiMode}
-                onActionTaken={(action) => sendMessage(action)}
+                onActionTaken={sendMessage}
                 demoRunning={demoRunning}
               />
             </Grid>
