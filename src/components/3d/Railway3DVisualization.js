@@ -11,11 +11,8 @@ import {
   Speed, Pause, PlayArrow, Refresh, Visibility, 
   Train as TrainIcon, Warning, CheckCircle, Videocam,
   ThreeDRotation, CenterFocusStrong, MyLocation,
-  Timeline, Psychology, Emergency
+  Timeline, Psychology, ReportProblem
 } from '@mui/icons-material';
-import Spline from '@spline-tool/react-spline';
-import { useSpline3D } from '@/hooks/useSpline3D';
-import SplineSceneManager from './SplineSceneManager';
 
 export default function Railway3DVisualization({ 
   scenario, 
@@ -23,117 +20,146 @@ export default function Railway3DVisualization({
   trafficData, 
   demoRunning 
 }) {
-  // State management
-  const [loading, setLoading] = useState(true);
-  const [sceneError, setSceneError] = useState(false);
-  const [currentCamera, setCurrentCamera] = useState('overview');
-  const [selectedTrain, setSelectedTrain] = useState(null);
+  //const [loading, setLoading] = useState(true);
+  const [trains, setTrains] = useState([]);
   const [animationSpeed, setAnimationSpeed] = useState(1.0);
+  const [viewMode, setViewMode] = useState('overview');
+  const [selectedTrain, setSelectedTrain] = useState(null);
   const [performanceMetrics, setPerformanceMetrics] = useState({});
   
-  // Refs
-  const splineRef = useRef(null);
-  const sceneManagerRef = useRef(null);
-  
-  // Custom hook for 3D logic
-  const {
-    trains,
-    updateTrainPositions,
-    generateScenarioData,
-    handleScenarioChange
-  } = useSpline3D(scenario, aiMode);
-
-  // Spline scene URL - Replace with your actual scene
-  const splineSceneUrl = process.env.NEXT_PUBLIC_SPLINE_SCENE_URL || 
-    'https://prod.spline.design/6Wq8RjlyM3dBn2pf/scene.splinecode';
-
-  // Handle Spline scene loading
-  const onSplineLoad = useCallback((splineApp) => {
-    console.log('🎬 Spline scene loaded successfully');
-    setLoading(false);
-    splineRef.current = splineApp;
-    
-    // Initialize scene manager
-    sceneManagerRef.current = new SplineSceneManager(splineApp);
-    
-    // Set up initial scene
-    const initialData = generateScenarioData(scenario, aiMode);
-    sceneManagerRef.current.updateScene(initialData);
-    
-    // Set up interaction handlers
-    setupSceneInteractions(splineApp);
-    
-  }, [scenario, aiMode, generateScenarioData]);
-
-  // Set up scene interactions
-  const setupSceneInteractions = useCallback((splineApp) => {
-    // Handle train clicks
-    window.addEventListener('message', (event) => {
-      if (event.data.type === 'TRAIN_SELECTED') {
-        setSelectedTrain(event.data.trainId);
-        
-        // Focus camera on selected train
-        const trainObject = splineApp.findObjectByName(`train-${event.data.trainId}`);
-        if (trainObject && sceneManagerRef.current) {
-          sceneManagerRef.current.focusOnTrain(trainObject);
-        }
+  // Generate realistic train movements based on scenario
+  const generateScenarioTrains = useCallback(() => {
+    const baseTrains = [
+      {
+        id: 'EXP001',
+        name: 'Rajdhani Express',
+        type: 'EXPRESS',
+        position: { x: -80 + Math.random() * 10, y: 0, z: 0 },
+        speed: 85,
+        color: '#ff4444',
+        priority: 8,
+        passengers: 1250,
+        destination: 'New Delhi'
+      },
+      {
+        id: 'LOC002',
+        name: 'Local Passenger',
+        type: 'LOCAL',
+        position: { x: -40 + Math.random() * 10, y: 0, z: 6 },
+        speed: 60,
+        color: '#4444ff',
+        priority: 5,
+        passengers: 890,
+        destination: 'Suburban Station'
+      },
+      {
+        id: 'FRG003',
+        name: 'Freight Express',
+        type: 'FREIGHT',
+        position: { x: 40 + Math.random() * 10, y: 0, z: -6 },
+        speed: 45,
+        color: '#44ff44',
+        priority: 3,
+        cargo: 2400,
+        destination: 'Industrial Hub'
+      },
+      {
+        id: 'EXP004',
+        name: 'Shatabdi Express',
+        type: 'EXPRESS',
+        position: { x: 80 + Math.random() * 10, y: 0, z: 0 },
+        speed: 90,
+        color: '#ff8800',
+        priority: 9,
+        passengers: 1100,
+        destination: 'Business District'
       }
-    });
+    ];
 
-    // Handle scenario updates from parent
-    window.addEventListener('message', (event) => {
-      if (event.data.type === 'SCENARIO_UPDATE') {
-        handleScenarioChange(event.data.scenario, event.data.aiMode);
-      }
-    });
-  }, [handleScenarioChange]);
-
-  // Update scene when scenario/AI mode changes
-  useEffect(() => {
-    if (sceneManagerRef.current) {
-      const sceneData = generateScenarioData(scenario, aiMode);
-      sceneManagerRef.current.updateScene(sceneData);
+    // Modify based on scenario
+    return baseTrains.map(train => {
+      let modifiedTrain = { ...train };
       
-      // Update performance metrics
-      setPerformanceMetrics({
-        throughput: calculateThroughput(sceneData.trains),
-        efficiency: calculateEfficiency(scenario, aiMode),
-        conflicts: sceneData.conflicts?.length || 0,
-        optimizedTrains: sceneData.trains.filter(t => t.optimized).length
-      });
-    }
-  }, [scenario, aiMode, generateScenarioData]);
+      switch (scenario) {
+        case 'congestion':
+          modifiedTrain.speed *= 0.6;
+          modifiedTrain.conflicted = Math.random() < 0.4;
+          modifiedTrain.delay = Math.random() < 0.3 ? Math.floor(Math.random() * 8) + 2 : 0;
+          modifiedTrain.status = modifiedTrain.delay > 0 ? 'DELAYED' : 'RUNNING';
+          break;
+          
+        case 'emergency':
+          if (train.id === 'EXP001') {
+            modifiedTrain.emergency = true;
+            modifiedTrain.speed *= 1.5;
+            modifiedTrain.priority = 10;
+            modifiedTrain.color = '#ff0000';
+            modifiedTrain.status = 'EMERGENCY';
+          } else {
+            modifiedTrain.speed *= 0.3;
+            modifiedTrain.status = 'HOLDING';
+          }
+          break;
+          
+        case 'optimized':
+          if (aiMode) {
+            modifiedTrain.speed *= 1.3;
+            modifiedTrain.optimized = true;
+            modifiedTrain.delay = Math.max(0, (modifiedTrain.delay || 0) - 5);
+            modifiedTrain.efficiency = 95 + Math.random() * 5;
+            modifiedTrain.status = 'OPTIMIZED';
+          }
+          break;
+          
+        default: // normal
+          modifiedTrain.status = 'RUNNING';
+          break;
+      }
+      
+      return modifiedTrain;
+    });
+  }, [scenario, aiMode]);
 
-  // Animation loop for demo mode
+  // Simulate loading
+  // useEffect(() => {
+  //   const timer = setTimeout(() => {
+  //     setLoading(false);
+  //   }, 2000);
+  //   return () => clearTimeout(timer);
+  // }, []);
+
+  // Update trains data and performance metrics
   useEffect(() => {
-    if (!demoRunning || !sceneManagerRef.current) return;
+    const newTrains = generateScenarioTrains();
+    setTrains(newTrains);
+    
+    // Update performance metrics
+    setPerformanceMetrics({
+      throughput: calculateThroughput(newTrains),
+      efficiency: calculateEfficiency(scenario, aiMode),
+      conflicts: newTrains.filter(t => t.conflicted).length,
+      optimizedTrains: newTrains.filter(t => t.optimized).length
+    });
+  }, [scenario, aiMode, generateScenarioTrains]);
+
+  // Animation loop for demo
+  useEffect(() => {
+    if (!demoRunning) return;
 
     const animationInterval = setInterval(() => {
-      updateTrainPositions(animationSpeed);
-      
-      if (sceneManagerRef.current) {
-        const updatedData = generateScenarioData(scenario, aiMode);
-        sceneManagerRef.current.animateTrains(updatedData.trains, animationSpeed);
-      }
+      setTrains(prevTrains => 
+        prevTrains.map(train => ({
+          ...train,
+          position: {
+            ...train.position,
+            x: train.position.x + (train.speed * 0.1 * animationSpeed) / 10
+          }
+        }))
+      );
     }, 100);
 
     return () => clearInterval(animationInterval);
-  }, [demoRunning, animationSpeed, scenario, aiMode, updateTrainPositions, generateScenarioData]);
-
-  // Camera control functions
-  const changeCameraView = useCallback((viewType) => {
-    if (!sceneManagerRef.current) return;
-    
-    sceneManagerRef.current.setCameraView(viewType);
-    setCurrentCamera(viewType);
-  }, []);
-
-  // Error handling
-  const onSplineError = useCallback((error) => {
-    console.error('Spline scene loading error:', error);
-    setSceneError(true);
-    setLoading(false);
-  }, []);
+  }, [demoRunning, animationSpeed]);
 
   // Performance calculations
   const calculateThroughput = (trainsList) => {
@@ -172,7 +198,7 @@ export default function Railway3DVisualization({
       boxShadow: 3
     }}>
       {/* Loading State */}
-      {loading && (
+      {/* {loading && (
         <Box sx={{
           position: 'absolute',
           top: '50%',
@@ -195,64 +221,175 @@ export default function Railway3DVisualization({
           </Typography>
           <LinearProgress sx={{ mt: 2, width: '100%' }} />
         </Box>
-      )}
+      )} */}
 
-      {/* Error Fallback */}
-      {sceneError && (
+      {/* Fallback 3D Simulation */}
+      {(
         <Box sx={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 10,
-          textAlign: 'center'
+          width: '100%',
+          height: '100%',
+          background: scenario === 'emergency' 
+            ? 'linear-gradient(135deg, #d32f2f 0%, #f57c00 100%)'
+            : scenario === 'congestion'
+            ? 'linear-gradient(135deg, #ff9800 0%, #ffb74d 100%)'
+            : scenario === 'optimized' && aiMode
+            ? 'linear-gradient(135deg, #4caf50 0%, #81c784 100%)'
+            : 'linear-gradient(135deg, #1976d2 0%, #64b5f6 100%)',
+          position: 'relative',
+          borderRadius: 2,
+          overflow: 'hidden'
         }}>
-          <Alert severity="warning" sx={{ mb: 2, minWidth: 300 }}>
-            <Typography variant="h6">3D Scene Unavailable</Typography>
-            <Typography variant="body2">
-              Spline scene could not be loaded. Using fallback mode.
-            </Typography>
-          </Alert>
-          
-          {/* Fallback 2D visualization */}
-          <Card sx={{ p: 3, bgcolor: 'background.paper' }}>
-            <Typography variant="subtitle1" gutterBottom>
-              Railway Network Simulation
-            </Typography>
-            <Box sx={{ 
-              width: '100%', 
-              height: 300, 
-              bgcolor: 'primary.light', 
-              borderRadius: 2,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexDirection: 'column'
-            }}>
-              <TrainIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
-              <Typography variant="h6" color="primary.main">
-                Simulation Active
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Scenario: {scenario} | AI: {aiMode ? 'Enabled' : 'Disabled'}
-              </Typography>
-            </Box>
-          </Card>
-        </Box>
-      )}
+          {/* Railway Track SVG Animation */}
+          <svg
+            width="100%"
+            height="100%"
+            style={{ position: 'absolute', top: 0, left: 0 }}
+          >
+            {/* Main track lines */}
+            <line x1="10%" y1="45%" x2="90%" y2="45%" stroke="rgba(255,255,255,0.8)" strokeWidth="6" />
+            <line x1="10%" y1="55%" x2="90%" y2="55%" stroke="rgba(255,255,255,0.8)" strokeWidth="6" />
+            
+            {/* Parallel tracks */}
+            <line x1="10%" y1="35%" x2="90%" y2="35%" stroke="rgba(255,255,255,0.6)" strokeWidth="4" />
+            <line x1="10%" y1="65%" x2="90%" y2="65%" stroke="rgba(255,255,255,0.6)" strokeWidth="4" />
+            
+            {/* Track switches */}
+            <path d="M 30% 45% L 40% 35%" stroke="rgba(255,255,255,0.8)" strokeWidth="4" />
+            <path d="M 60% 55% L 70% 65%" stroke="rgba(255,255,255,0.8)" strokeWidth="4" />
+            
+            {/* Railway sleepers */}
+            {[...Array(20)].map((_, i) => (
+              <rect
+                key={i}
+                x={`${15 + i * 3.5}%`}
+                y="40%"
+                width="2%"
+                height="20%"
+                fill="rgba(255,255,255,0.4)"
+                rx="1"
+              />
+            ))}
+            
+            {/* Animated trains */}
+            {trains.map((train, index) => {
+              const xPosition = `${Math.max(5, Math.min(85, 20 + (index * 20) + (demoRunning ? Math.sin(Date.now() / 1000 + index) * 5 : 0)))}%`;
+              const yPosition = index % 2 === 0 ? '42%' : index === 1 ? '32%' : '62%';
+              
+              return (
+                <g key={train.id}>
+                  {/* Train body */}
+                  <rect
+                    x={xPosition}
+                    y={yPosition}
+                    width="8%"
+                    height="12%"
+                    fill={train.color}
+                    rx="3"
+                    style={{
+                      filter: train.optimized ? 'drop-shadow(0 0 8px #4caf50)' : 
+                             train.conflicted ? 'drop-shadow(0 0 8px #f44336)' :
+                             train.emergency ? 'drop-shadow(0 0 12px #ff0000)' : 'none',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => setSelectedTrain(selectedTrain === train.id ? null : train.id)}
+                  />
+                  
+                  {/* Train windows */}
+                  <rect
+                    x={`calc(${xPosition} + 1%)`}
+                    y={`calc(${yPosition} + 2%)`}
+                    width="6%"
+                    height="8%"
+                    fill="rgba(135, 206, 235, 0.7)"
+                    rx="1"
+                  />
+                  
+                  {/* Train label */}
+                  <text
+                    x={`calc(${xPosition} + 4%)`}
+                    y={`calc(${yPosition} + 7%)`}
+                    fill="white"
+                    fontSize="10"
+                    fontWeight="bold"
+                    textAnchor="middle"
+                    style={{ userSelect: 'none' }}
+                  >
+                    {train.type.substring(0, 3)}
+                  </text>
+                  
+                  {/* Speed indicator */}
+                  <text
+                    x={`calc(${xPosition} + 4%)`}
+                    y={`calc(${yPosition} + 16%)`}
+                    fill="white"
+                    fontSize="8"
+                    textAnchor="middle"
+                    style={{ userSelect: 'none' }}
+                  >
+                    {Math.round(train.speed)} km/h
+                  </text>
+                  
+                  {/* Status indicators */}
+                  {train.optimized && (
+                    <circle
+                      cx={`calc(${xPosition} + 9%)`}
+                      cy={`calc(${yPosition} + 2%)`}
+                      r="3"
+                      fill="#4caf50"
+                    />
+                  )}
+                  {train.conflicted && (
+                    <circle
+                      cx={`calc(${xPosition} + 9%)`}
+                      cy={`calc(${yPosition} + 2%)`}
+                      r="3"
+                      fill="#f44336"
+                    />
+                  )}
+                  {train.emergency && (
+                    <circle
+                      cx={`calc(${xPosition} + 9%)`}
+                      cy={`calc(${yPosition} + 2%)`}
+                      r="4"
+                      fill="#ff0000"
+                      style={{ animation: 'pulse 1s infinite' }}
+                    />
+                  )}
+                </g>
+              );
+            })}
+            
+            {/* Signal lights */}
+            <circle cx="25%" cy="30%" r="4" fill={scenario === 'emergency' ? '#ff0000' : scenario === 'congestion' ? '#ffaa00' : '#00ff00'} />
+            <circle cx="50%" cy="70%" r="4" fill={scenario === 'emergency' ? '#ff0000' : scenario === 'congestion' ? '#ffaa00' : '#00ff00'} />
+            <circle cx="75%" cy="30%" r="4" fill={scenario === 'emergency' ? '#ff0000' : scenario === 'congestion' ? '#ffaa00' : '#00ff00'} />
+          </svg>
 
-      {/* Spline 3D Scene */}
-      {!sceneError && (
-        <Spline
-          scene={splineSceneUrl}
-          onLoad={onSplineLoad}
-          onError={onSplineError}
-          style={{
-            width: '100%',
-            height: '100%',
-            borderRadius: '8px'
-          }}
-        />
+          {/* Scenario-based overlay effects */}
+          {scenario === 'emergency' && (
+            <Box sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'radial-gradient(circle, rgba(255,0,0,0.1) 0%, rgba(255,0,0,0.3) 100%)',
+              animation: 'pulse 2s infinite'
+            }} />
+          )}
+          
+          {aiMode && scenario === 'optimized' && (
+            <Box sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'radial-gradient(circle, rgba(76,175,80,0.1) 0%, rgba(76,175,80,0.2) 100%)',
+              animation: 'pulse 3s infinite'
+            }} />
+          )}
+        </Box>
       )}
 
       {/* Live Status Panel */}
@@ -272,7 +409,7 @@ export default function Railway3DVisualization({
               <Badge badgeContent={trains.length} color="primary">
                 <TrainIcon sx={{ mr: 1, color: 'primary.main' }} />
               </Badge>
-              Live Network Status
+              Live Railway Network
             </Typography>
             
             {demoRunning && (
@@ -381,7 +518,7 @@ export default function Railway3DVisualization({
                 </Box>
                 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  {train.emergency && <Emergency sx={{ color: 'error.main', fontSize: 16 }} />}
+                  {train.emergency && <ReportProblem sx={{ color: 'error.main', fontSize: 16 }} />}
                   {train.optimized && <Psychology sx={{ color: 'success.main', fontSize: 16 }} />}
                   <Chip
                     label={`${train.speed} km/h`}
@@ -410,26 +547,26 @@ export default function Railway3DVisualization({
         <SpeedDialAction
           icon={<Visibility />}
           tooltipTitle="Overview Camera"
-          onClick={() => changeCameraView('overview')}
+          onClick={() => setViewMode('overview')}
         />
         <SpeedDialAction
           icon={<MyLocation />}
           tooltipTitle="Track Level View"
-          onClick={() => changeCameraView('track')}
+          onClick={() => setViewMode('track')}
         />
         <SpeedDialAction
           icon={<CenterFocusStrong />}
           tooltipTitle="Junction View"
-          onClick={() => changeCameraView('junction')}
+          onClick={() => setViewMode('junction')}
         />
         <SpeedDialAction
           icon={<TrainIcon />}
           tooltipTitle="Station View"
-          onClick={() => changeCameraView('station')}
+          onClick={() => setViewMode('station')}
         />
       </SpeedDial>
 
-      {/* Animation & View Controls */}
+      {/* Animation Controls */}
       <Box sx={{
         position: 'absolute',
         bottom: 20,
@@ -449,10 +586,10 @@ export default function Railway3DVisualization({
             </Fab>
           </Tooltip>
           
-          <Tooltip title="Reset Camera">
+          <Tooltip title="Reset View">
             <Fab
               size="small"
-              onClick={() => changeCameraView('overview')}
+              onClick={() => setViewMode('overview')}
             >
               <Refresh />
             </Fab>
@@ -533,6 +670,21 @@ export default function Railway3DVisualization({
           </Typography>
         </Alert>
       )}
+
+      {/* CSS for animations */}
+      <style jsx global>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.7; }
+        }
+        .spinning {
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </Box>
   );
 }

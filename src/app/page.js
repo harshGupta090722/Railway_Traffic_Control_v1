@@ -1,125 +1,335 @@
+// src/app/page.js
 'use client';
-
-import PropTypes from 'prop-types';
-import { 
-  Container, 
-  Typography, 
-  Button, 
-  Paper, 
-  Box,
-  Grid,
-  Card,
-  CardContent,
-  Chip
+import { useState, useEffect } from 'react';
+import {
+  Container, Grid, Paper, Typography, Box, Card, CardContent,
+  AppBar, Toolbar, Chip, Button, Alert, Fab, IconButton,
+  Drawer, List, ListItem, ListItemIcon, ListItemText, Divider
 } from '@mui/material';
-import { 
-  Train, 
-  Speed, 
-  CheckCircle,
-  Psychology 
+import {
+  Train, Traffic, Speed, Warning, CheckCircle, Timeline,
+  Psychology, Settings, Menu, Dashboard as DashboardIcon, Assessment,
+  ModelTraining, NotificationsActive
 } from '@mui/icons-material';
 
-export default function Home() {
-  const testFeatures = [
-    { name: 'Next.js 14', status: 'Working', color: 'success' },
-    { name: 'Material-UI v5', status: 'Working', color: 'success' }, 
-    { name: 'JavaScript', status: 'Working', color: 'success' },
-    { name: 'Spline 3D', status: 'Ready', color: 'info' },
-    { name: 'Theme System', status: 'Working', color: 'success' },
-  ];
+// Import components
+import TrafficControlCenter from '@/components/dashboard/TrafficControlCenter';
+import AIRecommendations from '@/components/dashboard/AIRecommendations';
+import PerformanceMetrics from '@/components/dashboard/PerformanceMetrics';
+import Railway3DVisualization from '@/components/3d/Railway3DVisualization';
+import ConflictManager from '@/components/dashboard/ConflictManager';
+import SystemStatus from '@/components/dashboard/SystemStatus';
 
-  const handleNextSteps = (action) => {
-    console.log(`Ready to ${action}!`);
+export default function Home() {
+  // Simplified state management
+  const [selectedScenario, setSelectedScenario] = useState('normal');
+  const [aiMode, setAiMode] = useState(false);
+  const [alerts, setAlerts] = useState([]);
+  const [demoRunning, setDemoRunning] = useState(false);
+  
+  // Mock data to prevent loading issues
+  const trafficData = {
+    trains: [
+      { id: 'EXP001', name: 'Rajdhani Express', type: 'EXPRESS', speed: 85, status: 'RUNNING' },
+      { id: 'LOC002', name: 'Local Passenger', type: 'LOCAL', speed: 60, status: 'RUNNING' },
+      { id: 'FRG003', name: 'Freight Express', type: 'FREIGHT', speed: 45, status: 'DELAYED' },
+      { id: 'EXP004', name: 'Shatabdi Express', type: 'EXPRESS', speed: 90, status: 'RUNNING' }
+    ]
   };
 
+  const connectionStatus = 'Connected';
+
+  // Demo scenarios
+  const scenarios = {
+    normal: { 
+      name: 'Normal Operations', 
+      color: 'success',
+      description: 'Standard railway traffic flow'
+    },
+    congestion: { 
+      name: 'Rush Hour Congestion', 
+      color: 'warning',
+      description: 'High traffic with optimization opportunities'
+    },
+    emergency: { 
+      name: 'Emergency Priority', 
+      color: 'error',
+      description: 'Emergency vehicle routing scenario'
+    },
+    optimized: { 
+      name: 'AI Optimized', 
+      color: 'info',
+      description: 'AI-powered traffic optimization active'
+    }
+  };
+
+  // Simplified handlers
+  const handleScenarioChange = (scenario) => {
+    setSelectedScenario(scenario);
+    
+    // Show transition alert
+    setAlerts(prev => [...prev.slice(-3), {
+      type: 'SCENARIO_CHANGE',
+      message: `Switched to ${scenarios[scenario].name}`,
+      level: 'info',
+      timestamp: new Date().toISOString(),
+      id: Date.now()
+    }]);
+  };
+
+  const toggleAIMode = () => {
+    const newAiMode = !aiMode;
+    setAiMode(newAiMode);
+    
+    setAlerts(prev => [...prev.slice(-3), {
+      type: 'AI_MODE_CHANGE',
+      message: newAiMode ? 'AI Optimization ACTIVATED' : 'AI Optimization DEACTIVATED',
+      level: newAiMode ? 'success' : 'info',
+      timestamp: new Date().toISOString(),
+      id: Date.now()
+    }]);
+  };
+
+  const startDemoSequence = () => {
+    if (demoRunning) return;
+    
+    setDemoRunning(true);
+    
+    // Simple demo sequence
+    const demoSteps = [
+      { scenario: 'normal', duration: 3000 },
+      { scenario: 'congestion', duration: 4000 },
+      { scenario: 'optimized', aiMode: true, duration: 4000 }
+    ];
+    
+    let currentStep = 0;
+    const executeStep = () => {
+      if (currentStep < demoSteps.length) {
+        const step = demoSteps[currentStep];
+        setSelectedScenario(step.scenario);
+        if (step.aiMode) setAiMode(true);
+        
+        currentStep++;
+        setTimeout(executeStep, step.duration);
+      } else {
+        setDemoRunning(false);
+      }
+    };
+    
+    executeStep();
+  };
+
+  const sendMessage = (message) => {
+    console.log('Message sent:', message);
+    // Mock response
+    setTimeout(() => {
+      setAlerts(prev => [...prev.slice(-3), {
+        type: 'ACTION_RESPONSE',
+        message: `Action completed: ${message.type}`,
+        level: 'success',
+        timestamp: new Date().toISOString(),
+        id: Date.now()
+      }]);
+    }, 1000);
+  };
+
+  // Navigation items
+  const navigationItems = [
+    { text: 'Dashboard', icon: DashboardIcon, active: true },
+    { text: 'Live Traffic', icon: Traffic },
+    { text: 'AI Insights', icon: Psychology },
+    { text: 'Analytics', icon: Assessment },
+    { text: 'Training', icon: ModelTraining },
+    { text: 'Settings', icon: Settings }
+  ];
+
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Header */}
-      <Paper 
-        elevation={3} 
-        sx={{ 
-          p: 4, 
-          mb: 4, 
-          textAlign: 'center', 
-          background: 'linear-gradient(135deg, #1976d2 0%, #2e7d32 100%)', 
-          color: 'white' 
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f5f5f5' }}>
+      {/* Sidebar Navigation */}
+      <Drawer
+        variant="permanent"
+        sx={{
+          width: 240,
+          flexShrink: 0,
+          '& .MuiDrawer-paper': {
+            width: 240,
+            boxSizing: 'border-box',
+            bgcolor: '#1e293b',
+            color: 'white'
+          },
         }}
       >
-        <Train sx={{ fontSize: 48, mb: 2 }} />
-        <Typography variant="h3" gutterBottom>
-          SIH 2025 Railway Traffic Control
-        </Typography>
-        <Typography variant="h6" sx={{ opacity: 0.9 }}>
-          AI-Powered Train Management System - JavaScript Setup Complete! 🚀
-        </Typography>
-      </Paper>
-
-      {/* Status Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        {testFeatures.map((feature, index) => (
-          <Grid item xs={12} sm={6} md={4} key={index}>
-            <Card>
-              <CardContent sx={{ textAlign: 'center' }}>
-                <CheckCircle sx={{ fontSize: 40, color: 'success.main', mb: 2 }} />
-                <Typography variant="h6" gutterBottom>
-                  {feature.name}
-                </Typography>
-                <Chip 
-                  label={feature.status} 
-                  color={feature.color}
-                  size="small"
-                />
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-
-      {/* Next Steps */}
-      <Paper elevation={2} sx={{ p: 3 }}>
-        <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-          <Psychology sx={{ mr: 1 }} />
-          Next Steps
-        </Typography>
-        <Typography variant="body1" sx={{ mb: 2 }}>
-          Your JavaScript project is successfully set up! Here's what to do next:
-        </Typography>
-        
-        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-          <Button 
-            variant="contained" 
-            startIcon={<Speed />}
-            onClick={() => handleNextSteps('build components')}
-          >
-            Build Components
-          </Button>
-          <Button 
-            variant="outlined" 
-            onClick={() => handleNextSteps('setup database connection')}
-          >
-            Setup Database
-          </Button>
-          <Button 
-            variant="outlined"
-            onClick={() => handleNextSteps('create 3D scene')}
-          >
-            Design 3D Scene
-          </Button>
+        <Box sx={{ p: 3, textAlign: 'center', borderBottom: '1px solid #334155' }}>
+          <Train sx={{ fontSize: 32, color: 'primary.main', mb: 1 }} />
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            SIH 2025
+          </Typography>
+          <Typography variant="body2" sx={{ opacity: 0.7 }}>
+            Railway Control
+          </Typography>
         </Box>
-      </Paper>
+        
+        <List>
+          {navigationItems.map((item) => (
+            <ListItem 
+              key={item.text}
+              sx={{ 
+                bgcolor: item.active ? 'rgba(25, 118, 210, 0.2)' : 'transparent',
+                borderRight: item.active ? '3px solid #1976d2' : 'none'
+              }}
+            >
+              <ListItemIcon sx={{ color: item.active ? 'primary.main' : 'inherit' }}>
+                <item.icon />
+              </ListItemIcon>
+              <ListItemText primary={item.text} />
+            </ListItem>
+          ))}
+        </List>
+      </Drawer>
 
-      {/* JavaScript Features Highlight */}
-      <Paper elevation={1} sx={{ p: 2, mt: 3, bgcolor: 'info.light', color: 'info.contrastText' }}>
-        <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
-          <CheckCircle sx={{ mr: 1, fontSize: 18 }} />
-          <strong>JavaScript Ready:</strong> PropTypes for type checking, JSConfig for IntelliSense, and ES6+ features enabled
-        </Typography>
-      </Paper>
-    </Container>
+      {/* Main Content */}
+      <Box component="main" sx={{ flexGrow: 1 }}>
+        {/* Top Navigation Bar */}
+        <AppBar position="static" sx={{ bgcolor: '#1976d2', mb: 3 }}>
+          <Toolbar>
+            <Train sx={{ mr: 2 }} />
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+              AI-Powered Railway Traffic Control System
+            </Typography>
+            
+            {/* Connection Status */}
+            <Chip
+              label={`Status: ${connectionStatus}`}
+              color="success"
+              sx={{ mr: 2, color: 'white' }}
+            />
+            
+            {/* Current Scenario */}
+            <Chip
+              label={scenarios[selectedScenario].name}
+              color={scenarios[selectedScenario].color}
+              sx={{ mr: 2 }}
+            />
+            
+            {/* AI Mode Toggle */}
+            <Button
+              variant="contained"
+              color={aiMode ? 'success' : 'inherit'}
+              onClick={toggleAIMode}
+              startIcon={aiMode ? <CheckCircle /> : <Speed />}
+              sx={{ mr: 2 }}
+            >
+              {aiMode ? 'AI Active' : 'Manual Mode'}
+            </Button>
+            
+            {/* Demo Control */}
+            <Button
+              variant="outlined"
+              color="inherit"
+              onClick={startDemoSequence}
+              disabled={demoRunning}
+              startIcon={<Timeline />}
+            >
+              {demoRunning ? 'Demo Running...' : 'Start Demo'}
+            </Button>
+          </Toolbar>
+        </AppBar>
+
+        <Container maxWidth="xl">
+          {/* Alert System */}
+          {alerts.slice(-2).map((alert) => (
+            <Alert
+              key={alert.id}
+              severity={alert.level || 'info'}
+              sx={{ mb: 2 }}
+              onClose={() => setAlerts(prev => prev.filter(a => a.id !== alert.id))}
+            >
+              {alert.message}
+            </Alert>
+          ))}
+
+          {/* Main Dashboard Grid */}
+          <Grid container spacing={3}>
+            {/* 3D Railway Visualization */}
+            <Grid item xs={12} lg={8}>
+              <Paper elevation={3} sx={{ p: 2, height: 600, position: 'relative' }}>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Traffic sx={{ mr: 1, verticalAlign: 'middle' }} />
+                  Live Railway Network
+                </Typography>
+                <Railway3DVisualization 
+                  scenario={selectedScenario}
+                  aiMode={aiMode}
+                  trafficData={trafficData}
+                  demoRunning={demoRunning}
+                />
+              </Paper>
+            </Grid>
+
+            {/* AI Recommendations Panel */}
+            <Grid item xs={12} lg={4}>
+              <AIRecommendations 
+                scenario={selectedScenario}
+                aiMode={aiMode}
+                onActionTaken={sendMessage}
+                demoRunning={demoRunning}
+              />
+            </Grid>
+
+            {/* Performance Metrics */}
+            <Grid item xs={12} md={6}>
+              <PerformanceMetrics 
+                data={trafficData}
+                scenario={selectedScenario}
+                aiMode={aiMode}
+              />
+            </Grid>
+
+            {/* Traffic Control Center */}
+            <Grid item xs={12} md={6}>
+              <TrafficControlCenter 
+                onScenarioChange={handleScenarioChange}
+                currentScenario={selectedScenario}
+                scenarios={scenarios}
+                demoRunning={demoRunning}
+              />
+            </Grid>
+
+            {/* System Status */}
+            <Grid item xs={12} md={6}>
+              <SystemStatus 
+                trafficData={trafficData}
+                connectionStatus={connectionStatus}
+                aiMode={aiMode}
+              />
+            </Grid>
+
+            {/* Conflict Management */}
+            <Grid item xs={12} md={6}>
+              <ConflictManager 
+                trafficData={trafficData}
+                aiMode={aiMode}
+                scenario={selectedScenario}
+              />
+            </Grid>
+          </Grid>
+        </Container>
+
+        {/* Floating Action Button for Quick Demo */}
+        <Fab
+          color="secondary"
+          sx={{ 
+            position: 'fixed', 
+            bottom: 24, 
+            right: 24,
+            '&:hover': { transform: 'scale(1.1)' }
+          }}
+          onClick={startDemoSequence}
+          disabled={demoRunning}
+        >
+          <NotificationsActive />
+        </Fab>
+      </Box>
+    </Box>
   );
 }
-
-// PropTypes validation (replaces TypeScript types)
-Home.propTypes = {
-  // Add prop types as needed when this component receives props
-};
